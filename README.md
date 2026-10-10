@@ -2,7 +2,7 @@
 
 A budget analyzer for property owners associations. It forecasts each budget line with its own method, checks the figures against the source records, turns the accounting forecast into year-end cash scenarios, drafts next year's budget, and models reserve funding over 30 years.
 
-**Live demo:** _add your GitHub Pages link here_
+**Live demo:** https://real-kenneth.github.io/ledgerline/
 
 > All data in this repository is fictional. "Pecan Hollow POA" and every figure in the demo are invented. Ledgerline was built from an independent analysis I did for a real association, whose records are kept private.
 
