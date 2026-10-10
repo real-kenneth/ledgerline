@@ -1,0 +1,688 @@
+<title>Ledgerline Demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: treasurer's worksheet — summary, reconciliation, line-by-line forecast, cash bridge, next-year budget, then an illustrative reserve model */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#17231f; --muted:#5b6b65; --line:#d7dfdb;
+  --accent:#1f6b5a; --accent-soft:#e1efea;
+  --good:#2f7d4f; --warn:#b07a12; --bad:#b4372f;
+  --good-bg:#e4f2e9; --warn-bg:#f8eed6; --bad-bg:#f8e1df; --neutral-bg:#e8ecea;
+  --s1:#0f8a6c; --s2:#8a5cc2;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Public Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111816; --surface:#18221f; --ink:#e4ece8; --muted:#94a59e; --line:#2a3833;
+  --accent:#5fc0a5; --accent-soft:#1d3530;
+  --good:#6cc48f; --warn:#e2b04f; --bad:#ef7d74;
+  --good-bg:#1b3325; --warn-bg:#3a2f15; --bad-bg:#3d1e1c; --neutral-bg:#24302c; --s1:#2f9e80; --s2:#a07ad8; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --surface:#18221f; --ink:#e4ece8; --muted:#94a59e; --line:#2a3833;
+  --accent:#5fc0a5; --accent-soft:#1d3530;
+  --good:#6cc48f; --warn:#e2b04f; --bad:#ef7d74;
+  --good-bg:#1b3325; --warn-bg:#3a2f15; --bad-bg:#3d1e1c; --neutral-bg:#24302c; --s1:#2f9e80; --s2:#a07ad8; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(1.7rem,4vw,2.4rem);letter-spacing:-.01em}
+h2{font-size:1.2rem} h3{font-size:1rem}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.lede{color:var(--muted);max-width:66ch;margin:6px 0 0}
+.tag{display:inline-flex;gap:6px;align-items:center;font-size:.8rem;padding:3px 10px;border-radius:99px;margin-top:10px}
+.tag.real{background:var(--accent-soft);color:var(--accent)} .tag.demo{background:var(--warn-bg);color:var(--warn)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.setup{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);font-weight:500}
+label.check{flex-direction:row;align-items:center;gap:8px}
+label.check input{width:auto}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;box-sizing:border-box}
+input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+input::placeholder{color:var(--muted);opacity:.8}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:.78rem;color:var(--muted)}
+.kpi .v{font-family:var(--mono);font-size:1.4rem;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:.8rem;color:var(--muted)}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.head{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.head>div{min-width:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+table.wide{min-width:1240px}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:bottom}
+th.r{text-align:right}
+td{padding:6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td input,td select{padding:5px 7px}
+tr.group td{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding-top:16px;border-bottom:none}
+tr.total td{font-weight:600;border-bottom:2px solid var(--line)}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.pill.good{background:var(--good-bg);color:var(--good)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.neutral{background:var(--neutral-bg);color:var(--muted)}
+.bar{position:relative;height:6px;background:var(--line);border-radius:3px;min-width:80px;margin-top:4px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.bar i.warn{background:var(--warn)} .bar i.bad{background:var(--bad)}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+.computed{font-family:var(--mono);text-align:right;padding:5px 7px;color:var(--muted)}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:600}
+button.x{border:none;background:none;color:var(--muted);padding:4px 8px;font-size:1.1rem}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.findings{display:flex;flex-direction:column;gap:10px;margin:12px 0 0;padding:0;list-style:none}
+.findings li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;background:var(--bg)}
+.findings li .pill{margin-top:2px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.two>*{min-width:0}
+dl.ledger{display:grid;grid-template-columns:1fr auto;gap:8px 16px;margin:12px 0 0}
+dl.ledger dt{color:var(--muted)} dl.ledger dd{margin:0;font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+dl.ledger .sum{border-top:1px solid var(--line);padding-top:8px;color:var(--ink);font-weight:600}
+dl.ledger dd.big{font-size:1.2rem;color:var(--accent);font-weight:500}
+.note{font-size:.82rem;color:var(--muted);max-width:72ch}
+.recon{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}
+.recon div{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg)}
+.recon span:first-child{font-size:.85rem}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:8px;background:var(--warn-bg);color:var(--ink);font-size:.88rem}
+.banner b{color:var(--warn)}
+.section-title{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.chartbox{position:relative;margin-top:10px}
+.chartbox svg{width:100%;height:auto;display:block}
+.chartbox text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:190px}
+.tip .row{display:flex;justify-content:space-between;gap:12px}
+.tip .row span:last-child{font-family:var(--mono)}
+.tip .sw{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+details summary{cursor:pointer;color:var(--accent);font-weight:500;margin-top:12px}
+details table{min-width:600px;margin-top:8px}
+.warnlist{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.methods{columns:2 320px;column-gap:28px;margin:10px 0 0;padding-left:18px}
+.methods li{break-inside:avoid;margin-bottom:8px;font-size:.88rem}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Ledgerline · Association budget analyzer</div>
+    <h1>Forecast the year line by line, then see what it means for cash.</h1>
+    <p class="lede">Each budget line gets its own forecast method, because dues collected in January, an insurance premium not yet billed, and a monthly electric bill should not be projected the same way. Ledgerline flags material variances, reconciles to the source workbook, bridges to year-end operating cash, and drafts next year's budget.</p>
+    <span class="tag real" id="caseTag"></span>
+  </header>
+
+  <section class="panel setup" aria-label="Association setup">
+    <label for="name">Association<input id="name"></label>
+    <label for="lots">Lots<input id="lots" type="number" min="1" class="num"></label>
+    <label for="asof">Actuals through<input id="asof" type="date"></label>
+    <label for="growth">Cost growth next year (%)<input id="growth" type="number" step="0.1" class="num"></label>
+    <label for="mat">Materiality threshold ($)<input id="mat" type="number" class="num"></label>
+    <label class="check" for="anon" id="anonWrap"><input id="anon" type="checkbox">Hide name on screen</label>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Summary"></section>
+
+  <section class="panel" id="reconPanel">
+    <h2>Agreement with the source records</h2>
+    <p class="note" id="reconIntro"></p>
+    <h3 style="margin-top:14px">Source-data import check</h3>
+    <div class="recon" id="reconSrc"></div>
+    <h3 style="margin-top:14px">Forecast agreement with source estimates</h3>
+    <div class="recon" id="recon"></div>
+    <details><summary>Show line-by-line comparison</summary><div class="scroll" id="reconLines"></div></details>
+  </section>
+
+  <section class="panel">
+    <div class="head">
+      <div><h2>Budget, actual, and forecast</h2>
+        <div class="note">"% of budget used" compares year-to-date spending with the full-year budget; the tick marks the share of the year elapsed. Status compares the full-year forecast with the budget, and ignores differences smaller than the materiality threshold.</div></div>
+      <div class="tools"><button id="addExp" class="primary">Add expense line</button><button id="addRev">Add revenue line</button></div>
+    </div>
+    <div class="scroll"><table class="wide">
+      <thead><tr>
+        <th>Line item</th><th>Forecast method</th><th class="r">2026 budget</th><th class="r">Actual YTD</th><th>% of budget used</th>
+        <th class="r">Full-year forecast</th><th class="r">Forecast vs budget</th><th>Status</th><th class="r">2027 proposed</th><th>Basis / note</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div class="tools" style="margin-top:12px"><button id="fillProp">Fill empty 2027 amounts from forecast × cost growth</button><button id="reset">Restore source data</button></div>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h2>Findings for the board</h2>
+      <p class="note">Ranked by dollar impact. Forecasts and proposals are estimates, not adopted decisions.</p>
+      <ul class="findings" id="findings"></ul>
+    </div>
+    <div class="panel">
+      <h2>What the records leave unresolved</h2>
+      <p class="note">The association's records do not include these, so Ledgerline treats each as an editable assumption rather than a fact.</p>
+      <ul class="findings" id="unresolved"></ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><div><h2>Illustrative operating-cash scenarios, December 31</h2>
+      <div class="note">An accounting forecast is not a cash forecast. These scenarios show how the unresolved items above change year-end liquidity. They are sensitivity cases, not predicted outcomes.</div></div></div>
+    <div class="setup">
+      <label for="cash">Operating cash on as-of date, excl. CD ($)<input id="cash" type="number" step="0.01" class="num"></label>
+      <label for="ar">Opening receivables, as reported ($)<input id="ar" type="number" step="0.01" class="num"></label>
+      <label for="revCash">Remaining recognized revenue received in cash (%)<input id="revCash" type="number" class="num"></label>
+      <label for="intCash">Remaining interest received into operating cash ($)<input id="intCash" type="number" step="0.01" class="num"></label>
+      <label for="liabCash">Assumed cash settlement of opening liabilities ($)<input id="liabCash" type="number" step="0.01" class="num"></label>
+      <label for="xfer">Transfers from operating cash to reserves ($)<input id="xfer" type="number" class="num"></label>
+      <label for="refunds">Expected cash refunds or credits ($)<input id="refunds" type="number" step="0.01" class="num"></label>
+      <label for="cd">Reserve / contingency CD ($)<input id="cd" type="number" step="0.01" class="num"></label>
+    </div>
+    <p class="note" id="bridgeContext" style="margin-top:8px"></p>
+    <div class="scroll" style="margin-top:12px"><table id="bridge" style="min-width:620px"></table></div>
+    <p class="note" style="margin-top:12px">Remaining activity = full-year forecast − actual to date. Only the remaining portion of bad-debt expense is removed from payments, because bad debt is an accounting entry, not a cash outflow; collection risk is handled once, through the receivable scenarios. Remaining expenses are assumed to be paid by December 31. If a line's forecast is below what is already recorded, the difference is not treated as cash coming back; enter any expected refund or credit separately. A transfer to reserves lowers operating cash and raises reserve cash by the same amount.</p>
+  </section>
+
+  <section class="panel">
+    <div class="head"><div><h2>Preliminary 2027 budget</h2><div class="note">Totals of the "2027 proposed" column. Blank lines default to forecast × cost growth.</div></div></div>
+    <div class="two">
+      <dl class="ledger" id="proposal"></dl>
+      <div><h3>Largest changes from the 2026 forecast</h3><ul class="findings" id="changes"></ul></div>
+    </div>
+  </section>
+
+  <section class="section-title" id="reserves">
+    <div class="eyebrow">Reserve funding model · 30-year cash flow</div>
+    <h2 style="font-size:1.6rem">Will reserves cover the major replacements?</h2>
+    <p class="lede">A pooled cash-flow model: each component's cost is inflated from its cost-estimate date to the year it is replaced, the balance earns interest, and Ledgerline solves for the smallest year-1 contribution that keeps the balance above your minimum, tested two ways: at each year-end, and at a stress low point where replacements are paid before contributions arrive.</p>
+    <div class="banner"><b>Illustrative scenario.</b><span>The components, balance, contribution, and floor below are sample figures, not this association's records. A real model needs an asset inventory with condition, cost estimates and their dates, and a board-confirmed funding goal.</span></div>
+  </section>
+
+  <section class="panel setup" aria-label="Reserve assumptions">
+    <label for="rStart">Opening reserve balance ($)<input id="rStart" type="number" class="num"></label>
+    <label for="rContrib">Year-1 contribution, entered plan ($)<input id="rContrib" type="number" class="num"></label>
+    <label for="rGrow">Contribution growth per year (%)<input id="rGrow" type="number" step="0.1" class="num"></label>
+    <label for="rRate">Interest earned (%)<input id="rRate" type="number" step="0.1" class="num"></label>
+    <label for="rInfl">Replacement cost growth (%)<input id="rInfl" type="number" step="0.1" class="num"></label>
+    <label for="rFloor">Minimum balance ($)<input id="rFloor" type="number" class="num"></label>
+    <label for="rYear">First projection year<input id="rYear" type="number" class="num"></label>
+    <label for="rCostYear">Cost estimates dated (year)<input id="rCostYear" type="number" class="num"></label>
+    <label for="rValYear">Valuation year (balance and condition date)<input id="rValYear" type="number" class="num"></label>
+    <label for="rBasis">Minimum plan shown in chart<select id="rBasis"><option value="low">Meets replacement-first low points</option><option value="yearend">Meets year-end balances only</option></select></label>
+    <label class="check" for="rIndex"><input id="rIndex" type="checkbox">Grow the minimum with inflation</label>
+  </section>
+
+  <ul class="warnlist" id="rWarn"></ul>
+  <section class="kpis" id="rKpis" aria-label="Reserve summary"></section>
+
+  <section class="panel">
+    <div class="head">
+      <div><h2>Projected reserve balance</h2><div class="note">Year-end balances. Dips mark years with major replacements; a balance below zero is an unfunded shortfall, not money available to spend.</div></div>
+      <div class="legend" id="rLegend"></div>
+    </div>
+    <div class="chartbox" id="rChart"></div>
+    <details><summary>Show year-by-year table</summary><div class="scroll" id="rTable"></div></details>
+  </section>
+
+  <section class="panel">
+    <div class="head">
+      <div><h2>Reserve components</h2><div class="note">Years used = useful life − (next replacement year − valuation year). Fully funded share = cost at the valuation year × (years used ÷ useful life): what should already be saved if the component wears evenly.</div></div>
+      <div class="tools"><button id="addComp" class="primary">Add component</button></div>
+    </div>
+    <div class="scroll"><table style="min-width:760px">
+      <thead><tr><th>Component</th><th class="r">Replacement cost (as estimated)</th><th class="r">Useful life (yrs)</th><th class="r">Next replacement year</th><th class="r">Years used</th><th class="r">Fully funded share</th><th></th></tr></thead>
+      <tbody id="comps"></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><div><h2>Calculation tests</h2><div class="note">These run on synthetic data every time the page loads, so a broken formula shows up here rather than in a board report.</div></div><span class="pill" id="testSummary"></span></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>Test</th><th>Expected result</th><th>Result</th></tr></thead><tbody id="tests"></tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Methods and assumptions</h2>
+    <ul class="methods">
+      <li><b>Forecast methods.</b> Run rate: actual ÷ share of year elapsed. Full-year amount recognized: the year's revenue or expense is already on the books, so the forecast equals the actual (this says nothing about whether the cash has been collected). Scheduled payment and estimate: an entered full-year amount, with the reason in the note column.</li>
+      <li><b>Share of year elapsed</b> is computed from the actual cutoff date (<span id="elapsedEx"></span>), not from month-end.</li>
+      <li><b>Two different measures.</b> "% of budget used" compares spending to date with the full-year budget. "Forecast vs budget" compares the expected full-year total with the budget.</li>
+      <li><b>Status thresholds</b> (5% watch, 15% over, plus the dollar materiality threshold) are configurable management screens, not industry standards.</li>
+      <li><b>Unbudgeted lines</b> (budget of zero with activity) are flagged as unbudgeted rather than divided by zero. Assessment discounts are contra-revenue: they reduce revenue, are shown as not separately budgeted, and never receive a favorable flag.</li>
+      <li><b>Cash scenarios.</b> Accounting forecasts become cash only through stated assumptions: the share of remaining revenue received, interest deposited to operating accounts, receivables collected (0%, 50%, 100%), liabilities settled, and transfers to reserves. Each result is shown beside its assumptions.</li>
+      <li><b>Reserve timing.</b> Costs are inflated from the cost-estimate year to the replacement year. Component age comes from the separate valuation year, so updating a quote does not change how worn an asset is. Year-1 contributions are the entered amount; growth starts in year 2. Interest is earned on the opening balance each year, which can overstate interest when a large replacement happens early in a year.</li>
+      <li><b>Minimum contributions</b> are threshold-funding results, not full funding. Ledgerline reports two: the smallest year-1 contribution meeting every year-end balance, and the smallest meeting a replacement-first low point (the year's replacements paid from the opening balance before contributions and interest arrive). The low point is a timing stress test, separate from the annual interest approximation.</li>
+      <li><b>Source checks</b> compare every line's budget and actual against an unchangeable copy of the source data, keyed by stable line IDs (not general-ledger account numbers). All agreement checks use one tolerance: amounts agree when they differ by less than one cent.</li>
+      <li><b>Input validation.</b> Percentages are limited to 0–100. Calendar years and useful lives must be whole numbers (lives at least 1); an invalid entry is outlined and blocks the reserve calculation until fixed, so no replacement is ever silently dropped.</li>
+      <li><b>Percent-funded bands</b> (under 30% weak, 30% to under 70% fair, 70% and above strong) follow common practitioner guidelines. They are not a CAI-mandated grade, and 70% is not fully funded.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const DEMO=true;
+const KEY="ledgerline-demo-v1";
+const SOURCE_LABEL="the demo's fictional source records";
+const CASE_TAG="Public demo with entirely fictional data. The association, its records, and every figure here are invented to show how the analysis works.";
+const WORKBOOK=null; // demo totals are computed from the fictional source
+const REPORTED={name:"Pecan Hollow POA (fictional)",lots:380,asof:"2026-06-27",cash:96415.6,ar:13284.1,liab:1750,cd:94302.85};
+const UNRESOLVED=[
+ ["Receivables",`No aging report or collection history, and no indication whether the ${"$"}13,284.10 is gross or net of an allowance.`],
+ ["Liabilities",`The ${"$"}1,750 of current liabilities has no breakdown, so its cash settlement timing is unknown.`],
+ ["Interest","CD and bank interest are combined in the source; where remaining interest is deposited is unknown."],
+ ["Reserves","No component inventory or replacement schedule, so the reserve section uses an illustrative scenario."]];
+const SRC_LINES=[
+ ["R01","Gross property assessments","rev",48450,48640,"full",48640,48640,"Front-loaded: full year recognized by June",{assess:true}],
+ ["R02","Assessment discounts","rev",0,-8915,"full",-8915,-8900,"Contra-revenue: reduces assessment revenue",{contra:true}],
+ ["R03","Late fees","rev",0,418,"est",550,450,"Source estimate"],
+ ["R04","Fees and permits","rev",0,1140,"est",1900,2400,"Source estimate"],
+ ["R05","Interest income: CD and bank","rev",3200,1287.4,"est",2650,2800,"Source estimate",{interest:true}],
+ ["E01","Bad debt","exp",0,612.18,"est",700,850,"Accounting entry, excluded from cash payments",{noncash:true}],
+ ["E02","Accounting and professional fees","exp",900,450,"est",900,1000,""],
+ ["E03","Property taxes and permits","exp",75,81,"est",120,150,""],
+ ["E04","Federal tax","exp",1200,964,"est",1200,1250,""],
+ ["E05","Administration: county filings","exp",250,0,"sched",250,250,"No expense recorded YTD; scheduled forecast assumption"],
+ ["E06","Surety bond","exp",300,0,"sched",300,300,"No expense recorded YTD; scheduled forecast assumption"],
+ ["E07","General liability insurance","exp",4400,0,"sched",4400,4650,"No expense recorded YTD; scheduled forecast assumption"],
+ ["E08","Legal","exp",1500,0,"est",600,1500,""],
+ ["E09","Accounting software and payment fees","exp",900,1188.3,"est",2250,2400,"Already above full-year budget by the cutoff date"],
+ ["E10","Mailing and postage","exp",120,141.5,"est",260,280,""],
+ ["E11","Meeting expense","exp",75,42.1,"est",90,100,""],
+ ["E12","Office expense","exp",400,133.65,"est",280,300,""],
+ ["E13","Committees and social events","exp",8000,1905.2,"est",5200,5600,"Deliberately set below the $8,000 budget"],
+ ["E14","Architectural control","exp",350,96.4,"est",220,250,""],
+ ["E15","Landscaping","exp",2600,764.8,"est",1650,2600,""],
+ ["E16","Flags","exp",150,0,"est",120,150,""],
+ ["E17","Irrigation maintenance","exp",900,701.25,"est",1250,1350,""],
+ ["E18","General and entrance repairs","exp",4200,2066.9,"est",3900,5000,"Prior-year spike treated as unusual"],
+ ["E19","Electric","exp",4300,1946.75,"est",3950,4150,""],
+ ["E20","Water","exp",850,351.6,"est",720,780,""]];
+
+/* ---------- Source data (immutable) and defaults ---------- */
+const METHODS={run:"Run rate",full:"Full-year amount recognized",sched:"Scheduled payment",est:"Estimate"};
+const TOL=0.005; // one tolerance everywhere: amounts agree when they differ by less than one cent
+const agree=(a,b)=>Math.abs(a-b)<TOL;
+function deepFreeze(o){Object.values(o).forEach(v=>{if(v&&typeof v==="object")deepFreeze(v)});return Object.freeze(o)}
+const SOURCE=deepFreeze(SRC_LINES.map(([id,n,t,b,a,m,f,p,note,extra])=>Object.assign({id,n,t,b,a,m,f,p,note},extra||{})));
+const CASE={
+  name:REPORTED.name,lots:REPORTED.lots,asof:REPORTED.asof,growth:3.5,mat:250,
+  cash:REPORTED.cash,ar:REPORTED.ar,revCash:100,intCash:0,liabCash:REPORTED.liab,refunds:0,xfer:0,cd:REPORTED.cd,anon:false,
+  lines:SOURCE.map(l=>({...l})),
+  res:{start:92000,contrib:15000,grow:3,rate:2.5,infl:3.5,floor:25000,index:false,year:2027,costYear:2026,valYear:2027,basis:"low",comps:[
+   {n:"Road and parking seal coat",c:18000,l:5,next:2027},
+   {n:"Pool pumps and filters",c:22000,l:10,next:2028},
+   {n:"Pool resurfacing",c:85000,l:12,next:2030},
+   {n:"Playground equipment",c:35000,l:15,next:2032},
+   {n:"Perimeter fencing (wood)",c:64000,l:20,next:2033},
+   {n:"Clubhouse roof (shingle)",c:48000,l:25,next:2035},
+   {n:"Entry monument lighting",c:16000,l:15,next:2037},
+   {n:"Mailbox clusters",c:52000,l:20,next:2039}
+  ]}
+};
+let S;
+function load(){try{const j=localStorage.getItem(KEY);if(j){const s=JSON.parse(j);if(s&&Array.isArray(s.lines)&&s.res)return s}}catch(e){}return structuredClone(CASE)}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const $=id=>document.getElementById(id);
+const fmt=(v,c)=>{v=+v||0;const a=Math.abs(v);const s=a.toLocaleString("en-US",{minimumFractionDigits:c?2:0,maximumFractionDigits:c?2:0});return (v<0?"−$":"$")+s};
+const sgn=v=>(v>0?"+":"")+fmt(v);
+const pct=v=>(v*100).toFixed(0)+"%";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num=v=>v===""||v===null||v===undefined?null:(isFinite(+v)?+v:null);
+const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+function withState(st,fn){const k=S;S=st;try{return fn()}finally{S=k}}
+
+/* ---------- Operating forecast ---------- */
+function elapsed(){const d=new Date(S.asof+"T12:00:00");if(isNaN(d))return .5;const y0=new Date(d.getFullYear(),0,1),y1=new Date(d.getFullYear()+1,0,1);return clamp((Math.floor((d-y0)/864e5)+1)/Math.round((y1-y0)/864e5),.001,1)}
+function forecast(l){if(l.m==="run")return l.a/elapsed();if(l.m==="full")return +l.a;return num(l.f)??+l.a}
+function proposed(l){const p=num(l.p);if(p!==null)return p;const g=l.t==="exp"?1+S.growth/100:1;return Math.round(forecast(l)*g)}
+const belowRecorded=l=>!l.contra&&forecast(l)<l.a-TOL&&l.a>0;
+
+function status(l){
+  const F=forecast(l),B=+l.b,M=+S.mat,d=F-B;
+  if(l.contra)return{st:"neutral",label:B?"Contra-revenue":"Not separately budgeted",d};
+  if(belowRecorded(l))return{st:"warn",label:"Forecast below recorded",d};
+  if(l.t==="exp"){
+    if(!B)return F>M?{st:"warn",label:"Unbudgeted",d}:{st:"good",label:"On track",d};
+    const r=F/B;
+    if(d>M&&r>1.15)return{st:"bad",label:"Over budget",d};
+    if(d>M&&r>1.05)return{st:"warn",label:"Watch",d};
+    if(d<-M)return{st:"good",label:"Under budget",d};
+    return{st:"good",label:"On track",d};
+  }
+  if(!B)return{st:"neutral",label:"Not budgeted",d};
+  const r=F/B;
+  if(d<-M&&r<.85)return{st:"bad",label:"Short",d};
+  if(d<-M&&r<.95)return{st:"warn",label:"Watch",d};
+  if(d>M)return{st:"good",label:"Above budget",d};
+  return{st:"good",label:"On track",d};
+}
+function totals(){const T={rB:0,rA:0,rF:0,rP:0,eB:0,eA:0,eF:0,eP:0,intP:0};
+  S.lines.forEach(l=>{const k=l.t==="rev"?"r":"e";T[k+"B"]+=+l.b;T[k+"A"]+=+l.a;T[k+"F"]+=forecast(l);T[k+"P"]+=proposed(l);if(l.interest)T.intP+=proposed(l)});return T}
+const EXPECTED=WORKBOOK||withState(structuredClone(CASE),()=>{const T=totals();return{ytdInc:T.rA,ytdExp:T.eA,inc:T.rF,exp:T.eF,pInc:T.rP,pExp:T.eP,count:SOURCE.length}});
+
+/* ---------- Setup ---------- */
+const SETUP=["name","lots","asof","growth","mat","cash","ar","revCash","intCash","liabCash","refunds","xfer","cd"];
+const PCTS=["revCash"];
+function caseTag(){const t=$("caseTag");t.className="tag "+(DEMO?"demo":"real");t.textContent=(S.anon?"Name hidden on screen only. ":"")+CASE_TAG;
+  const n=$("name");n.disabled=!!S.anon;if(S.anon)n.value="Name hidden";else if(document.activeElement!==n)n.value=S.name}
+function renderSetup(){SETUP.forEach(id=>$(id).value=S[id]);$("anon").checked=!!S.anon;$("anonWrap").hidden=DEMO;caseTag()}
+function renderStatic(){
+  $("reconIntro").textContent=`Two separate checks against ${SOURCE_LABEL}. The import check compares every line's budget and actual with an unchangeable copy of the source. Forecast agreement compares forecasts and proposals with the source's estimates; because those estimates were imported, agreement is an import check, not evidence that the forecasts are accurate.`;
+  $("unresolved").innerHTML=UNRESOLVED.map(([k,t])=>`<li><span class="pill neutral">${k}</span><span>${t}</span></li>`).join("");
+  const d=new Date(S.asof+"T12:00:00");$("elapsedEx").textContent=isNaN(d)?"":`${d.toLocaleDateString("en-US",{month:"long",day:"numeric"})} is ${(elapsed()*100).toFixed(1)}% of the year`;
+}
+
+/* ---------- Line table ---------- */
+function rowHTML(l,i){
+  const s=status(l),F=forecast(l),used=l.b?l.a/l.b:null,f=elapsed();
+  const w=used===null?0:clamp(used,0,1.5)/1.5*100,tick=f/1.5*100;
+  const fcell=(l.m==="run"||l.m==="full")?`<div class="computed">${fmt(F)}</div>`:`<input id="f${i}" data-k="f" type="number" class="num" value="${num(l.f)??""}" aria-label="Full-year forecast">`;
+  const ratio=l.b?` (${(F/l.b-1)>=0?"+":""}${Math.round((F/l.b-1)*100)}%)`:"";
+  const vcls=s.st==="neutral"?"":l.t==="exp"?(s.d>0?"neg":"pos"):(s.d<0?"neg":"pos");
+  return `<tr data-i="${i}">
+   <td style="min-width:210px"><input id="n${i}" data-k="n" value="${esc(l.n)}" aria-label="Line item name"></td>
+   <td style="width:150px"><select id="m${i}" data-k="m" aria-label="Forecast method">${Object.entries(METHODS).map(([k,v])=>`<option value="${k}"${l.m===k?" selected":""}>${v}</option>`).join("")}</select></td>
+   <td style="width:105px"><input id="b${i}" data-k="b" type="number" class="num" value="${l.b}" aria-label="2026 budget"></td>
+   <td style="width:115px"><input id="a${i}" data-k="a" type="number" step="0.01" class="num" value="${l.a}" aria-label="Actual year to date"></td>
+   <td style="width:110px">${used===null?'<span class="note">No budget</span>':`<span class="num" style="font-size:.8rem">${pct(used)}</span><div class="bar"><i class="${used>1&&l.t==="exp"?"bad":s.st==="warn"?"warn":""}" style="width:${w}%"></i><b style="left:${tick}%"></b></div>`}</td>
+   <td style="width:115px">${fcell}</td>
+   <td class="num ${vcls}" style="white-space:nowrap">${sgn(Math.round(s.d))}<span class="note">${ratio}</span></td>
+   <td><span class="pill ${s.st}">${s.label}</span></td>
+   <td style="width:110px"><input id="p${i}" data-k="p" type="number" class="num" value="${num(l.p)??""}" placeholder="${proposed({...l,p:null})}" aria-label="2027 proposed"></td>
+   <td style="min-width:200px"><input id="o${i}" data-k="note" value="${esc(l.note)}" aria-label="Basis or note"></td>
+   <td><button class="x" data-del="${i}" aria-label="Remove ${esc(l.n)}">×</button></td></tr>`;
+}
+function renderRows(){
+  const T=totals();let h="";
+  const tot=(lab,B,A,F,P,sub)=>`<tr class="total"${sub?' style="font-weight:500"':""}><td${sub?' style="padding-left:14px"':""}>${lab}</td><td></td><td class="num">${fmt(B)}</td><td class="num">${fmt(A,1)}</td><td></td><td class="num">${fmt(F)}</td><td class="num">${sgn(Math.round(F-B))}</td><td></td><td class="num">${fmt(P)}</td><td colspan="2"></td></tr>`;
+  [["rev","Revenue"],["exp","Expenses"]].forEach(([t,lab])=>{
+    h+=`<tr class="group"><td colspan="11">${lab}</td></tr>`;
+    S.lines.forEach((l,i)=>{if(l.t!==t)return;h+=rowHTML(l,i);
+      if(l.contra){const g=S.lines.filter(x=>x.assess||x.contra);h+=tot("Net assessment revenue",g.reduce((s,x)=>s+ +x.b,0),g.reduce((s,x)=>s+ +x.a,0),g.reduce((s,x)=>s+forecast(x),0),g.reduce((s,x)=>s+proposed(x),0),1)}});
+    const k=t==="rev"?"r":"e";h+=tot("Total "+lab.toLowerCase(),T[k+"B"],T[k+"A"],T[k+"F"],T[k+"P"]);
+  });
+  $("rows").innerHTML=h;
+}
+
+/* ---------- Summary, reconciliation, findings ---------- */
+function renderKpis(){
+  const T=totals(),net=T.rF-T.eF,bud=T.rB-T.eB;
+  const flagged=S.lines.filter(l=>["bad","warn"].includes(status(l).st)).length;
+  const lo=bridge(0),hi=bridge(1);
+  $("kpis").innerHTML=`
+   <div class="kpi"><span class="k">Forecast income less expenses</span><span class="v ${net<0?"neg":"pos"}">${fmt(net)}</span><span class="s">Budget ${fmt(bud)} · ${sgn(Math.round(net-bud))} vs budget · accounting basis, not cash</span></div>
+   <div class="kpi"><span class="k">Forecast expenses</span><span class="v">${fmt(T.eF)}</span><span class="s">${T.eB?pct(T.eF/T.eB):"—"} of ${fmt(T.eB)} budget</span></div>
+   <div class="kpi"><span class="k">Illustrative operating cash, Dec 31</span><span class="v" style="font-size:1.15rem">${fmt(lo.end)} – ${fmt(hi.end)}</span><span class="s">0% to 100% of opening receivables collected; other assumptions as set in the cash scenarios</span></div>
+   <div class="kpi"><span class="k">Lines needing attention</span><span class="v ${flagged?"neg":"pos"}">${flagged}</span><span class="s">${(elapsed()*100).toFixed(1)}% of the year elapsed at ${S.asof}</span></div>`;
+}
+function reconcile(){
+  const byId=new Map(S.lines.filter(l=>l.id).map(l=>[l.id,l]));
+  const missing=SOURCE.filter(s=>!byId.has(s.id));
+  const added=S.lines.filter(l=>!l.id||!SOURCE.some(s=>s.id===l.id));
+  const changed=[];
+  SOURCE.forEach(s=>{const l=byId.get(s.id);if(!l)return;const f=[];if(!agree(+l.b,s.b))f.push(`budget ${fmt(s.b)} → ${fmt(l.b)}`);if(!agree(+l.a,s.a))f.push(`actual ${fmt(s.a,1)} → ${fmt(l.a,1)}`);if(f.length)changed.push({s,f})});
+  return{missing,added,changed};
+}
+function renderRecon(){
+  const T=totals(),R=reconcile();
+  const card=(k,a,b,c)=>{const ok=agree(a,b);return `<div><span>${k}<br><span class="note num" style="text-align:left">${fmt(a,c)} vs ${fmt(b,c)}</span></span><span class="pill ${ok?"good":"warn"}">${ok?"Agrees":"Differs by "+fmt(a-b,c)}</span></div>`};
+  const lineOk=!R.missing.length&&!R.added.length&&!R.changed.length;
+  $("reconSrc").innerHTML=card("Actual income YTD",T.rA,EXPECTED.ytdInc,1)+card("Actual expenses YTD",T.eA,EXPECTED.ytdExp,1)+
+    `<div><span>Line-by-line budgets and actuals<br><span class="note" style="text-align:left">${SOURCE.length} source lines · ${R.changed.length} changed · ${R.missing.length} missing · ${R.added.length} added</span></span><span class="pill ${lineOk?"good":"warn"}">${lineOk?"Agrees":"Differs"}</span></div>`+
+    (lineOk?"":`<div style="grid-column:1/-1;display:block"><span class="note" style="max-width:none">${[...R.changed.map(c=>`<b>${c.s.id} ${esc(c.s.n)}</b>: ${c.f.join("; ")}`),...R.missing.map(s=>`<b>${s.id} ${esc(s.n)}</b>: missing`),...R.added.map(l=>`<b>${esc(l.n)}</b>: not in source`)].join("<br>")}</span></div>`);
+  $("recon").innerHTML=card("2026 forecast income",T.rF,EXPECTED.inc)+card("2026 forecast expenses",T.eF,EXPECTED.exp)+card("2027 proposed income",T.rP,EXPECTED.pInc)+card("2027 proposed expenses",T.eP,EXPECTED.pExp);
+  const byId=new Map(S.lines.filter(l=>l.id).map(l=>[l.id,l]));
+  let diffs=0;
+  const rows=SOURCE.map(s=>{const l=byId.get(s.id);if(!l){diffs++;return `<tr><td>${s.id}</td><td>${esc(s.n)}</td><td class="num">${fmt(s.f)}</td><td class="num">—</td><td class="num">${fmt(s.p)}</td><td class="num">—</td><td><span class="pill warn">Missing</span></td></tr>`}
+    const F=forecast(l),P=proposed(l),ok=agree(F,s.f)&&agree(P,s.p);if(!ok)diffs++;
+    return `<tr><td>${s.id}</td><td>${esc(s.n)}</td><td class="num">${fmt(s.f)}</td><td class="num">${fmt(F)}</td><td class="num">${fmt(s.p)}</td><td class="num">${fmt(P)}</td><td><span class="pill ${ok?"good":"warn"}">${ok?"Agrees":"Differs"}</span></td></tr>`}).join("");
+  $("reconLines").innerHTML=`<p class="note">${diffs?diffs+" line(s) differ from the source estimates because a method, amount, or line was changed.":"Every line agrees with the source's forecast and proposal."}</p><table><thead><tr><th>ID</th><th>Line item</th><th class="r">Source forecast</th><th class="r">Ledgerline forecast</th><th class="r">Source 2027</th><th class="r">Ledgerline 2027</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderFindings(){
+  const M=+S.mat,items=[];
+  const netA=()=>S.lines.filter(x=>x.assess||x.contra).reduce((a,x)=>a+forecast(x),0);
+  S.lines.forEach(l=>{const s=status(l),F=forecast(l);
+    if(l.contra){if(Math.abs(F)>M)items.push({w:Math.abs(F)+5e5,st:"warn",lab:"Not separately budgeted",t:`<b>${esc(l.n)}</b> reduce assessment revenue by ${fmt(-F)} for the year. The budget showed only gross assessments, so net assessment revenue is ${fmt(netA())}, not the ${fmt(S.lines.filter(x=>x.assess).reduce((a,x)=>a+ +x.b,0))} budgeted. Budget discounts as their own line in 2027.`});return}
+    if(s.label==="Forecast below recorded"){items.push({w:1e6+1,st:"warn",lab:"Needs explanation",t:`<b>${esc(l.n)}</b> has a full-year forecast of ${fmt(F)}, below the ${fmt(l.a,1)} already recorded. Explain the reversal or credit; the cash scenarios do not treat it as money coming back unless a refund is entered.`});return}
+    if(l.t==="exp"&&l.b>0&&l.a>l.b&&l.a-l.b>M/5)items.push({w:Math.abs(F-l.b)+1e6,st:"bad",lab:"Over budget",t:`<b>${esc(l.n)}</b>: spending to date (${fmt(l.a,1)}) already exceeds the full-year budget of ${fmt(l.b)} by ${((l.a/l.b-1)*100).toFixed(1)}%. The full-year forecast is ${fmt(F)}, ${pct(F/l.b-1)} above budget.${proposed(l)>l.b?` The 2027 proposal raises the allowance to ${fmt(proposed(l))}.`:""}`});
+    else if(s.label==="Unbudgeted")items.push({w:F,st:"warn",lab:"Unbudgeted",t:`<b>${esc(l.n)}</b> had no budget but is forecast at ${fmt(F)} for the year. Consider budgeting it explicitly in 2027.`});
+    else if(s.label==="Not budgeted"&&Math.abs(F)>M)items.push({w:Math.abs(F),st:"neutral",lab:"Not budgeted",t:`<b>${esc(l.n)}</b> was not in the 2026 budget and is forecast at ${fmt(F)}, income the budget did not count on.`});
+    else if(["bad","warn"].includes(s.st))items.push({w:Math.abs(s.d),st:s.st,lab:s.label,t:`<b>${esc(l.n)}</b> is forecast at ${fmt(F)} against a ${fmt(l.b)} budget (${sgn(Math.round(s.d))}).${l.note?" "+esc(l.note)+".":""}`});
+    else if(s.label==="Under budget"&&Math.abs(s.d)>M*4)items.push({w:Math.abs(s.d)*.5,st:"good",lab:"Under budget",t:`<b>${esc(l.n)}</b> is forecast ${fmt(-s.d)} under its ${fmt(l.b)} budget. Confirm whether spending is timing-related before treating it as savings.`});
+  });
+  items.sort((a,b)=>b.w-a.w);
+  $("findings").innerHTML=(items.length?items.slice(0,8):[{st:"good",lab:"On track",t:"No line differs from its budget by more than the materiality threshold."}]).map(x=>`<li><span class="pill ${x.st}">${x.lab}</span><span>${x.t}</span></li>`).join("");
+}
+
+/* ---------- Cash scenarios ---------- */
+// arShare = share of opening receivables collected (0–1). Negative remaining amounts are never treated as cash.
+function bridge(arShare,st=S){return withState(st,()=>{
+  let rev=0,pay=0,intRem=0,bdRem=0;const below=[];
+  let disc=0;
+  S.lines.forEach(l=>{const rem=forecast(l)-l.a;
+    if(l.contra){ // only discounts not yet recorded reduce future collections; recorded ones are already netted
+      if(rem>TOL)below.push(l);disc+=Math.min(rem,0);return}
+    if(rem<-TOL)below.push(l);
+    const r=Math.max(rem,0);
+    if(l.t==="rev"){if(l.interest)intRem+=r;else rev+=r}
+    else if(l.noncash)bdRem+=r; else pay+=r});
+  const gross=rev;rev=Math.max(rev+disc,0);
+  const revIn=rev*clamp(+S.revCash,0,100)/100,ar=(+S.ar)*arShare,intIn=+S.intCash,ref=+S.refunds||0;
+  const end=+S.cash+revIn+intIn+ar+ref-pay-(+S.liabCash)-(+S.xfer);
+  const reserve=(+S.cd)+(+S.xfer);
+  return{rev,gross,disc,revIn,intRem,intIn,ar,ref,pay,bdRem,below,end,reserve,combined:end+reserve};
+})}
+function renderBridge(){
+  const sc=[0,.5,1].map(x=>bridge(x)),b=sc[0];
+  $("bridgeContext").innerHTML=`Reported context: current liabilities ${fmt(REPORTED.liab,1)} (composition unknown) · remaining forecast interest ${fmt(b.intRem,1)} (CD vs bank allocation unknown) · remaining bad-debt expense ${fmt(b.bdRem,1)} removed from payments · remaining expenses assumed paid by Dec 31.`+
+    (b.below.length?`<br><span class="neg">Forecast below recorded amount (or a discount smaller than already recorded), not treated as cash: ${b.below.map(l=>esc(l.n)).join(", ")}. Enter any expected refund or credit separately.</span>`:"");
+  const row=(lab,vals,cls="")=>`<tr class="${cls}"><td>${lab}</td>${vals.map(v=>`<td class="num">${v}</td>`).join("")}</tr>`;
+  $("bridge").innerHTML=`<thead><tr><th>Bridge item</th><th class="r">0% of receivables</th><th class="r">50% of receivables</th><th class="r">100% of receivables</th></tr></thead><tbody>
+   ${row(`Operating cash, ${S.asof} (excl. CD)`,sc.map(()=>fmt(+S.cash,1)))}
+   ${row(`+ Remaining recognized revenue received (${clamp(+S.revCash,0,100)}% of ${fmt(b.rev,1)}${b.disc?`, net of ${fmt(-b.disc,1)} future discounts`:""})`,sc.map(x=>fmt(x.revIn,1)))}
+   ${row(`+ Remaining interest into operating cash (assumed)`,sc.map(x=>fmt(x.intIn,1)))}
+   ${row(`+ Opening receivables collected (of ${fmt(+S.ar,1)} reported)`,sc.map(x=>fmt(x.ar,1)))}
+   ${row(`+ Expected refunds or credits (entered)`,sc.map(x=>fmt(x.ref,1)))}
+   ${row(`− Remaining expense payments (excl. bad debt)`,sc.map(x=>fmt(-x.pay,1)))}
+   ${row(`− Assumed settlement of opening liabilities`,sc.map(()=>fmt(-S.liabCash,1)))}
+   ${row(`− Transfers to reserves`,sc.map(()=>fmt(-S.xfer,1)))}
+   ${row(`<b>Illustrative operating cash, Dec 31</b>`,sc.map(x=>`<b>${fmt(x.end,1)}</b>`),"total")}
+   ${row(`Reserve / contingency CD after transfers (before CD interest)`,sc.map(x=>fmt(x.reserve,1)))}
+   ${row(`Combined operating and reserve cash`,sc.map(x=>fmt(x.combined,1)))}
+   </tbody>`;
+}
+
+/* ---------- 2027 proposal ---------- */
+function renderProposal(){
+  const T=totals(),sur=T.rP-T.eP;
+  const assess=S.lines.filter(l=>l.assess).reduce((s,l)=>s+proposed(l),0);
+  $("proposal").innerHTML=`<dt>Proposed income</dt><dd>${fmt(T.rP)}</dd>
+   <dt>Proposed expenses</dt><dd>${fmt(-T.eP)}</dd>
+   <dt class="sum">Surplus after interest</dt><dd class="sum">${fmt(sur)}</dd>
+   <dt>Surplus before interest</dt><dd>${fmt(sur-T.intP)}</dd>
+   <dt>Average proposed gross assessment revenue per lot</dt><dd class="big">${S.lots?fmt(assess/S.lots,1):"—"}</dd>
+   <dt>Expense change vs 2026 forecast</dt><dd>${sgn(Math.round(T.eP-T.eF))}</dd>`;
+  const ch=S.lines.map(l=>({l,d:proposed(l)-forecast(l)})).filter(x=>Math.abs(x.d)>=S.mat).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,5);
+  $("changes").innerHTML=ch.length?ch.map(({l,d})=>`<li><span class="pill ${l.contra?"neutral":l.t==="exp"?(d>0?"warn":"good"):(d>0?"good":"warn")}">${sgn(Math.round(d))}</span><span><b>${esc(l.n)}</b>: ${fmt(forecast(l))} forecast → ${fmt(proposed(l))} proposed.${l.note?" "+esc(l.note)+".":""}</span></li>`).join(""):`<li><span class="pill neutral">None</span><span>No line changes by more than the materiality threshold.</span></li>`;
+}
+
+/* ---------- Reserve funding model (illustrative) ---------- */
+const RSET={rStart:"start",rContrib:"contrib",rGrow:"grow",rRate:"rate",rInfl:"infl",rFloor:"floor",rYear:"year",rCostYear:"costYear",rValYear:"valYear"};
+function renderResSetup(){for(const id in RSET)$(id).value=S.res[RSET[id]];$("rIndex").checked=!!S.res.index;$("rBasis").value=S.res.basis||"low"}
+const isYear=v=>Number.isInteger(+v)&&v!==""&&v!==null;
+const life=c=>+c.l;
+function reserveIssues(){const R=S.res,out=[];
+  [["First projection year",R.year],["Cost estimate year",R.costYear],["Valuation year",R.valYear]].forEach(([k,v])=>{if(!isYear(v))out.push(`${k} must be a whole calendar year.`)});
+  R.comps.forEach(c=>{if(!(Number.isInteger(+c.l)&&+c.l>=1))out.push(`${esc(c.n)}: useful life must be a whole number of years, at least 1.`);if(!isYear(c.next))out.push(`${esc(c.n)}: next replacement year must be a whole calendar year.`);if(!(+c.c>=0))out.push(`${esc(c.n)}: replacement cost must be zero or more.`)});
+  return out}
+function floorAt(y){const R=S.res;return R.index?R.floor*Math.pow(1+R.infl/100,y-1):+R.floor}
+// low = opening balance minus the year's replacements, before contributions and interest (timing stress test)
+function project(c0){
+  if(reserveIssues().length)return null; // never silently drop a replacement
+  const R=S.res,g=R.infl/100,i=R.rate/100,cg=R.grow/100,Y0=+R.year,out=[];let bal=+R.start;
+  for(let y=1;y<=30;y++){
+    const Y=Y0+y-1;let exp=0;
+    R.comps.forEach(c=>{const Lf=life(c),first=Math.max(+c.next||Y0,Y0);
+      if(Y>=first&&(Y-first)%Lf===0)exp+=(+c.c||0)*Math.pow(1+g,Y-(+R.costYear))});
+    const low=bal-exp,contrib=c0*Math.pow(1+cg,y-1),interest=Math.max(bal,0)*i;
+    bal=bal+interest+contrib-exp;
+    out.push({y,year:Y,contrib,exp,interest,bal,low,floor:floorAt(y)});
+  }
+  return out;
+}
+const meets=(p,basis)=>p.every(d=>d.bal>=d.floor&&(basis!=="low"||d.low>=d.floor));
+function minContribution(basis="yearend"){
+  if(reserveIssues().length)return null;
+  if(meets(project(0),basis))return 0;let lo=0,hi=1e7;if(!meets(project(hi),basis))return null;
+  for(let k=0;k<60;k++){const mid=(lo+hi)/2;meets(project(mid),basis)?hi=mid:lo=mid}
+  return Math.ceil(hi/100)*100;
+}
+function yearsUsed(c){const Lf=life(c),rem=clamp((+c.next||0)-(+S.res.valYear),0,Lf);return Lf-rem}
+function costAtVal(c){return (+c.c||0)*Math.pow(1+S.res.infl/100,(+S.res.valYear)-(+S.res.costYear))}
+function fullyFunded(c){return costAtVal(c)*yearsUsed(c)/life(c)}
+function pfInfo(){if(reserveIssues().length)return{ffb:NaN,pf:null,band:["bad","Blocked"]};const ffb=S.res.comps.reduce((s,c)=>s+fullyFunded(c),0);if(!(ffb>0))return{ffb,pf:null,band:["neutral","N/A: no positive funding benchmark"]};
+  const pf=S.res.start/ffb;return{ffb,pf,band:pf>=.7?["good","Strong"]:pf>=.3?["warn","Fair"]:["bad","Weak"]}}
+
+function renderComps(){
+  $("comps").innerHTML=S.res.comps.map((c,i)=>`<tr data-c="${i}">
+    <td style="min-width:200px"><input id="cn${i}" data-k="n" value="${esc(c.n)}" aria-label="Component name"></td>
+    <td style="width:130px"><input id="cc${i}" data-k="c" type="number" min="0" class="num" value="${c.c}" aria-label="Replacement cost"></td>
+    <td style="width:95px"><input id="cl${i}" data-k="l" type="number" min="1" step="1" class="num" value="${c.l}" aria-label="Useful life"${Number.isInteger(+c.l)&&+c.l>=1?"":' aria-invalid="true"'}></td>
+    <td style="width:110px"><input id="cy${i}" data-k="next" type="number" step="1" class="num" value="${c.next}" aria-label="Next replacement year"${isYear(c.next)?"":' aria-invalid="true"'}></td>
+    <td class="num">${reserveIssues().length?"—":yearsUsed(c)}</td>
+    <td class="num">${reserveIssues().length?"—":fmt(fullyFunded(c))}</td>
+    <td><button class="x" data-cdel="${i}" aria-label="Remove ${esc(c.n)}">×</button></td></tr>`).join("");
+}
+function renderReserve(){
+  const issues=reserveIssues();
+  if(issues.length){
+    $("rWarn").innerHTML=`<li class="banner" style="background:var(--bad-bg)"><b style="color:var(--bad)">Calculation blocked</b><span>Fix these inputs to see reserve results; nothing is calculated from invalid entries.<br>${issues.join("<br>")}</span></li>`;
+    $("rKpis").innerHTML="";$("rLegend").innerHTML="";$("rChart").innerHTML=`<p class="note">Reserve projection unavailable until the inputs above are corrected.</p>`;$("rTable").innerHTML="";return}
+  const R=S.res,MYE=minContribution("yearend"),MLO=minContribution("low");
+  const cur=project(+R.contrib),ye=MYE===null?null:project(MYE),lp=MLO===null?null:project(MLO);
+  const shownMin=(R.basis==="yearend"?MYE:MLO),shown=(R.basis==="yearend"?ye:lp)||cur;
+  const P=pfInfo();
+  const lowestYE=cur.reduce((m,d)=>d.bal<m.bal?d:m,cur[0]);
+  const tight=cur.reduce((m,d)=>(d.bal-d.floor)<(m.bal-m.floor)?d:m,cur[0]);
+  const firstShort=cur.find(d=>d.bal<d.floor),firstNeg=cur.find(d=>d.bal<0);
+  const warns=[];
+  if(+R.start<floorAt(1))warns.push(`The opening balance (${fmt(+R.start)}) is already below the ${fmt(floorAt(1))} minimum.`);
+  const due=R.comps.filter(c=>(+c.next||0)<=+R.year);
+  if(due.length)warns.push(`Due in ${R.year} or overdue: ${due.map(c=>esc(c.n)).join(", ")}. These are paid in year 1, before most year-1 contributions arrive.`);
+  const interim=(p,label)=>{const ys=p.filter(d=>d.low<d.floor&&d.bal>=d.floor);if(ys.length){const w=ys.reduce((m,d)=>d.low<m.low?d:m,ys[0]);warns.push(`${label}: meets the minimum at year-end, but if replacements are paid before contributions arrive the balance falls below it in ${ys.map(d=>d.year).join(", ")}, as low as ${fmt(w.low)} in ${w.year}.`)}};
+  interim(cur,"Entered plan");
+  if(ye)interim(ye,`The ${fmt(MYE)} year-end minimum plan does not pass the replacement-first liquidity check`);
+  $("rWarn").innerHTML=warns.map(t=>`<li class="banner"><b>Check</b><span>${t}</span></li>`).join("");
+  const perLot=v=>S.lots&&v?" · "+fmt(v/S.lots)+" per lot":"";
+  $("rKpis").innerHTML=`
+   <div class="kpi"><span class="k">Percent funded at ${R.valYear}</span><span class="v">${P.pf===null?"—":(P.pf*100).toFixed(0)+"%"} <span class="pill ${P.band[0]}" style="vertical-align:middle">${P.band[1]}</span></span><span class="s">${fmt(R.start)} saved vs ${fmt(P.ffb)} fully funded</span></div>
+   <div class="kpi"><span class="k">Minimum initial contribution meeting year-end balances</span><span class="v">${MYE===null?"Not reachable":fmt(MYE)}</span><span class="s">Year-end test only${perLot(MYE)}</span></div>
+   <div class="kpi"><span class="k">Minimum initial contribution meeting replacement-first low points</span><span class="v">${MLO===null?"Not reachable":fmt(MLO)}</span><span class="s">${MLO===null?"Opening balance or year-1 replacements prevent it":"Stricter timing test"+perLot(MLO)}</span></div>
+   <div class="kpi"><span class="k">Entered plan: lowest year-end balance</span><span class="v ${lowestYE.bal<0?"neg":""}">${fmt(lowestYE.bal)}</span><span class="s">${lowestYE.year} · ${firstShort?"first below minimum at year-end "+firstShort.year+(firstNeg?"; unfunded shortfall from "+firstNeg.year:""):"stays above the minimum at every year-end"}</span></div>
+   <div class="kpi"><span class="k">Entered plan: smallest margin above minimum</span><span class="v ${tight.bal<tight.floor?"neg":""}">${fmt(tight.bal-tight.floor)}</span><span class="s">${tight.year}, against a ${fmt(tight.floor)} minimum</span></div>
+   <div class="kpi"><span class="k">30-year replacement spending</span><span class="v">${fmt(cur.reduce((s,d)=>s+d.exp,0))}</span><span class="s">Future dollars at ${R.infl}% cost growth</span></div>`;
+  const lab=R.basis==="yearend"?"Year-end minimum plan":"Low-point minimum plan";
+  $("rLegend").innerHTML=`<span><i style="background:var(--s1)"></i>${lab}${shownMin!==null?" ("+fmt(shownMin)+" in year 1)":" (not reachable)"}</span><span><i style="background:var(--s2)"></i>Entered plan (${fmt(R.contrib)} in year 1)</span>`;
+  drawChart(cur,shown,lab);
+  const c=(v,f)=>`<td class="num ${v<f?"neg":""}">${fmt(v)}</td>`;
+  $("rTable").innerHTML=`<table style="min-width:900px"><thead><tr><th>Year</th><th class="r">Replacements</th><th class="r">Minimum</th><th class="r">Entered: low point*</th><th class="r">Entered: year-end</th><th class="r">Year-end plan: low point*</th><th class="r">Year-end plan: year-end</th><th class="r">Low-point plan: year-end</th></tr></thead><tbody>${
+    cur.map((d,k)=>`<tr><td class="num" style="text-align:left">${d.year}</td><td class="num">${fmt(d.exp)}</td><td class="num">${fmt(d.floor)}</td>${c(d.low,d.floor)}${c(d.bal,d.floor)}${ye?c(ye[k].low,d.floor)+c(ye[k].bal,d.floor):"<td>—</td><td>—</td>"}${lp?c(lp[k].bal,d.floor):"<td>—</td>"}</tr>`).join("")}</tbody></table><p class="note">*Low point: the year's replacements paid from the opening balance before that year's contributions and interest arrive. Red marks a value below the minimum.</p>`;
+}
+function drawChart(cur,rec,lab){
+  const W=760,H=300,P={l:64,r:14,t:14,b:30};
+  const vals=cur.concat(rec).flatMap(d=>[d.bal,d.floor]).concat([0]);
+  let lo=Math.min(...vals),hi=Math.max(...vals);
+  const step=niceStep((hi-lo)/5);lo=Math.floor(lo/step)*step;hi=Math.ceil(hi/step)*step;if(hi===lo)hi=lo+step;
+  const x=y=>P.l+(y-1)/29*(W-P.l-P.r), yv=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
+  const path=(p,k="bal")=>p.map((d,j)=>(j?"L":"M")+x(d.y).toFixed(1)+" "+yv(d[k]).toFixed(1)).join("");
+  let grid="";for(let v=lo;v<=hi+1e-6;v+=step){grid+=`<line x1="${P.l}" x2="${W-P.r}" y1="${yv(v)}" y2="${yv(v)}" stroke="${v===0?"var(--muted)":"var(--line)"}" stroke-width="1"/><text x="${P.l-8}" y="${yv(v)+4}" text-anchor="end">${axisFmt(v)}</text>`}
+  let xt="";[1,5,10,15,20,25,30].forEach(y=>xt+=`<text x="${x(y)}" y="${H-8}" text-anchor="middle">${+S.res.year+y-1}</text>`);
+  const last=cur[cur.length-1];
+  $("rChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="30-year year-end reserve balance under the entered plan and the ${lab.toLowerCase()}">
+    ${grid}${xt}
+    <path d="${path(cur,"floor")}" fill="none" stroke="var(--bad)" stroke-dasharray="4 4" stroke-width="1"/>
+    <text x="${W-P.r}" y="${yv(last.floor)-6}" text-anchor="end" style="fill:var(--bad)">Minimum</text>
+    <path d="${path(cur)}" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${path(rec)}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>
+    <g id="hov" style="display:none"><line id="hx" y1="${P.t}" y2="${H-P.b}" stroke="var(--muted)" stroke-width="1"/>
+      <circle id="h1" r="4.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/><circle id="h2" r="4.5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/></g>
+    <rect id="hit" x="${P.l}" y="0" width="${W-P.l-P.r}" height="${H}" fill="transparent"/>
+  </svg><div class="tip" id="tip" hidden></div>`;
+  const svg=$("rChart").querySelector("svg"),hit=$("hit"),tip=$("tip");
+  const move=ev=>{
+    const t=ev.touches?ev.touches[0]:ev,pt=svg.createSVGPoint();pt.x=t.clientX;pt.y=t.clientY;
+    const sp=pt.matrixTransform(svg.getScreenCTM().inverse());
+    const y=clamp(Math.round((sp.x-P.l)/(W-P.l-P.r)*29+1),1,30),a=rec[y-1],b=cur[y-1];
+    $("hov").style.display="";$("hx").setAttribute("x1",x(y));$("hx").setAttribute("x2",x(y));
+    $("h1").setAttribute("cx",x(y));$("h1").setAttribute("cy",yv(a.bal));$("h2").setAttribute("cx",x(y));$("h2").setAttribute("cy",yv(b.bal));
+    tip.innerHTML=`<b>${a.year} year-end</b><div class="row"><span><i class="sw" style="background:var(--s1)"></i>${lab}</span><span>${fmt(a.bal)}</span></div><div class="row"><span><i class="sw" style="background:var(--s2)"></i>Entered plan</span><span>${fmt(b.bal)}</span></div><div class="row" style="color:var(--muted)"><span>Replacements</span><span>${fmt(a.exp)}</span></div>`;
+    tip.hidden=false;const box=$("rChart").getBoundingClientRect(),px=x(y)/W*box.width;
+    tip.style.left=clamp(px-100,0,Math.max(box.width-220,0))+"px";tip.style.top="0px";
+  };
+  const out=()=>{$("hov").style.display="none";tip.hidden=true};
+  hit.addEventListener("mousemove",move);hit.addEventListener("touchstart",move,{passive:true});hit.addEventListener("touchmove",move,{passive:true});
+  hit.addEventListener("mouseleave",out);hit.addEventListener("touchend",out);
+}
+function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(Math.max(r,1)))),n=r/p;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p}
+function axisFmt(v){const a=Math.abs(v),s=v<0?"−$":"$";return a>=1e6?s+(a/1e6).toFixed(1)+"M":a>=1e3?s+Math.round(a/1e3)+"k":s+Math.round(a)}
+
+/* ---------- Calculation tests (synthetic data) ---------- */
+function baseState(){return{asof:"2026-06-30",growth:3.5,mat:250,lots:100,cash:50000,ar:10000,revCash:100,intCash:0,liabCash:0,refunds:0,xfer:0,cd:80000,lines:[],
+  res:{start:20000,contrib:10000,grow:3,rate:2,infl:3,floor:5000,index:false,year:2027,costYear:2026,valYear:2027,basis:"low",comps:[{n:"Roof",c:30000,l:20,next:2030},{n:"Pool",c:40000,l:12,next:2034}]}}}
+const TESTS=[
+ ["Annual insurance paid once","Forecast includes one payment, not annualized again",()=>withState(baseState(),()=>forecast({t:"exp",b:12000,a:12000,m:"sched",f:12000})===12000)],
+ ["Insurance not yet posted","Scheduled expense stays in the forecast",()=>withState(baseState(),()=>forecast({t:"exp",b:5000,a:0,m:"sched",f:5000})===5000)],
+ ["Negative assessment discount","Reduces revenue; no favorable flag",()=>withState(baseState(),()=>{S.lines=[{n:"Gross",t:"rev",b:1000,a:1000,m:"full",assess:true},{n:"Disc",t:"rev",b:0,a:-200,m:"full",contra:true}];const s=status(S.lines[1]);return agree(totals().rF,800)&&s.st==="neutral"&&!/above|good/i.test(s.label)})],
+ ["Receivable collection 0% → 100%","Cash rises by the receivable amount; revenue unchanged",()=>withState(baseState(),()=>{S.lines=[{n:"Dues",t:"rev",b:1000,a:600,m:"est",f:1000}];const r0=totals().rF,a=bridge(0),b=bridge(1);return agree(b.end-a.end,S.ar)&&totals().rF===r0})],
+ ["Transfer from operating to reserves","Operating falls, reserves rise, combined unchanged",()=>withState(baseState(),()=>{const a=bridge(.5);S.xfer=7000;const b=bridge(.5);return agree(a.end-b.end,7000)&&agree(b.reserve-a.reserve,7000)&&agree(a.combined,b.combined)})],
+ ["Forecast below recorded expense","$8,000 recorded, $5,000 forecast: no $3,000 cash refund; line flagged",()=>withState(baseState(),()=>{S.lines=[{n:"Repairs",t:"exp",b:6000,a:8000,m:"est",f:5000}];const b=bridge(0);return agree(b.pay,0)&&agree(b.end,S.cash)&&status(S.lines[0]).label==="Forecast below recorded"})],
+ ["Future assessment discounts","$10,000 future gross and −$1,000 future discounts, 100% collected → $9,000 cash",()=>withState(baseState(),()=>{S.lines=[{n:"Gross",t:"rev",b:10000,a:0,m:"est",f:10000,assess:true},{n:"Disc",t:"rev",b:0,a:0,m:"est",f:-1000,contra:true}];const b=bridge(0);return agree(b.revIn,9000)})],
+ ["Recorded discounts not deducted twice","Discounts already recorded do not reduce future collections again",()=>withState(baseState(),()=>{S.lines=[{n:"Gross",t:"rev",b:10000,a:10000,m:"full",assess:true},{n:"Disc",t:"rev",b:0,a:-1000,m:"full",contra:true}];return agree(bridge(0).revIn,0)})],
+ ["Offsetting source edits","+$100 on one actual and −$100 on another are both caught",()=>withState(structuredClone(CASE),()=>{const e=S.lines.filter(l=>l.t==="exp");e[1].a+=100;e[2].a-=100;return reconcile().changed.length===2})],
+ ["Higher reserve contribution","Future balances never decrease",()=>withState(baseState(),()=>{const a=project(10000),b=project(11000);return a.every((d,k)=>b[k].bal>=d.bal)})],
+ ["Contribution just below the year-end minimum","Breaches the floor at a year-end",()=>withState(baseState(),()=>{const m=minContribution("yearend");return m===0||(m!==null&&project(m-100).some(d=>d.bal<d.floor)&&meets(project(m),"yearend"))})],
+ ["Low-point minimum","Passes the replacement-first test; $100 less fails it",()=>withState(baseState(),()=>{const m=minContribution("low");return m===0||(m!==null&&meets(project(m),"low")&&!meets(project(m-100),"low"))})],
+ ["Replacement before contributions arrive","Low-point shortfall shows even if year-end is positive",()=>withState(baseState(),()=>{S.res.start=20000;S.res.costYear=2027;S.res.comps=[{n:"Big",c:30000,l:30,next:2027}];const d=project(15000)[0];return d.bal>0&&d.low<0})],
+ ["Fully funded uses valuation year","Valuation 2027, quote 2020, 0% inflation, replaced 2030, 10-yr life, $100,000 → $70,000",()=>withState(baseState(),()=>{S.res.valYear=2027;S.res.costYear=2020;S.res.infl=0;return agree(fullyFunded({c:100000,l:10,next:2030}),70000)})],
+ ["Fractional replacement year","$100,000 component, 10-yr life, next year 2030.5: calculation is blocked, not run with zero spending",()=>withState(baseState(),()=>{S.res.comps=[{n:"Roof",c:100000,l:10,next:2030.5}];return reserveIssues().length===1&&project(10000)===null&&minContribution("low")===null})],
+ ["Invalid useful life","A life of 0 or 7.5 years blocks the calculation",()=>withState(baseState(),()=>{S.res.comps=[{n:"A",c:1000,l:0,next:2030}];const a=project(1000)===null;S.res.comps=[{n:"B",c:1000,l:7.5,next:2030}];return a&&project(1000)===null})],
+ ["No funding benchmark","Fully funded balance of zero shows N/A, not 0% weak",()=>withState(baseState(),()=>{S.res.valYear=2027;S.res.comps=[{n:"New",c:50000,l:10,next:2037}];const p=pfInfo();return p.pf===null&&/N\/A/.test(p.band[1])})]
+];
+function renderTests(){let pass=0;
+  $("tests").innerHTML=TESTS.map(([n,exp,fn])=>{let ok=false;try{ok=!!fn()}catch(e){ok=false}if(ok)pass++;return `<tr><td>${n}</td><td class="note" style="max-width:none">${exp}</td><td><span class="pill ${ok?"good":"bad"}">${ok?"Pass":"Fail"}</span></td></tr>`}).join("");
+  const t=$("testSummary");t.className="pill "+(pass===TESTS.length?"good":"bad");t.textContent=`${pass} of ${TESTS.length} passing`;
+}
+
+/* ---------- Wiring ---------- */
+function keepFocus(fn){const f=document.activeElement?.id;fn();if(f&&$(f)&&document.activeElement?.id!==f)$(f).focus()}
+function renderAll(){keepFocus(()=>{renderRows();renderComps()});renderStatic();renderKpis();renderRecon();renderFindings();renderBridge();renderProposal();renderReserve();caseTag();save()}
+function readNum(el){const v=parseFloat(el.value);const bad=el.value!==""&&!isFinite(v);el.toggleAttribute("aria-invalid",bad);return isFinite(v)?v:0}
+
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.closest("#comps")){const i=+el.closest("tr").dataset.c,k=el.dataset.k,c=S.res.comps[i];
+    if(k==="n")c.n=el.value;else{let v=readNum(el);c[k]=el.value===""?"":v}
+    renderAll();return}
+  if(RSET[el.id]){const v=readNum(el);S.res[RSET[el.id]]=el.value===""?"":v;if(["rYear","rCostYear","rValYear"].includes(el.id))el.toggleAttribute("aria-invalid",!isYear(S.res[RSET[el.id]]));renderAll();return}
+  if(el.id==="rIndex"){S.res.index=el.checked;renderAll();return}
+  if(el.id==="rBasis"){S.res.basis=el.value;renderAll();return}
+  if(el.id==="anon"){S.anon=el.checked;renderAll();return}
+  if(el.closest("#rows")){const i=+el.closest("tr").dataset.i,k=el.dataset.k,l=S.lines[i];
+    if(k==="n"||k==="note"){l[k]=el.value;save();if(k==="n")renderFindings();return}
+    if(k==="m"){l.m=el.value;if((l.m==="sched"||l.m==="est")&&num(l.f)===null)l.f=Math.round(forecast({...l,m:"run"}))}
+    else if(k==="p"||k==="f")l[k]=el.value===""?null:readNum(el);
+    else l[k]=readNum(el);
+    renderAll();return}
+  if(SETUP.includes(el.id)){
+    if(["name","asof"].includes(el.id))S[el.id]=el.value;
+    else{let v=readNum(el);if(PCTS.includes(el.id)){el.toggleAttribute("aria-invalid",v<0||v>100);v=clamp(v,0,100)}if(el.id==="lots"){el.toggleAttribute("aria-invalid",!(Number.isInteger(v)&&v>=1))}S[el.id]=v}
+    renderAll()}
+});
+document.addEventListener("click",e=>{
+  const d=e.target.closest("[data-del]");if(d){S.lines.splice(+d.dataset.del,1);renderAll();return}
+  const cd=e.target.closest("[data-cdel]");if(cd){S.res.comps.splice(+cd.dataset.cdel,1);renderAll();return}
+  const add=t=>{S.lines.push({n:t==="exp"?"New expense":"New revenue",t,b:0,a:0,m:"run",f:null,p:null,note:""});renderAll();$("n"+(S.lines.length-1)).select()};
+  if(e.target.id==="addExp")add("exp");
+  if(e.target.id==="addRev")add("rev");
+  if(e.target.id==="reset"){S=structuredClone(CASE);renderSetup();renderResSetup();renderAll();return}
+  if(e.target.id==="fillProp"){S.lines.forEach(l=>{if(num(l.p)===null)l.p=proposed(l)});renderAll()}
+  if(e.target.id==="addComp"){S.res.comps.push({n:"New component",c:0,l:10,next:+S.res.year+4});renderAll();$("cn"+(S.res.comps.length-1)).select()}
+});
+S=load();renderSetup();renderResSetup();renderAll();renderTests();
+
+</script>
